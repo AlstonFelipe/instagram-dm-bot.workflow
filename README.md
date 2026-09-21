@@ -5,3 +5,47 @@ Bot de resposta automática para DMs do Instagram construído no [n8n](https://n
 O caso de uso original: assistente virtual do escritor brasileiro **Alston Fhellype** ([@alstonfhellype](https://www.instagram.com/alstonfhellype)), que responde leitores sobre seu catálogo de 10 livros e direciona compras para a Amazon e site oficial. O workflow é totalmente adaptável para qualquer persona/negócio — basta trocar o prompt.
 
 ## Como funciona
+
+Fluxo detalhado:
+
+1. **Instagram Webhook** — recebe os eventos POST da Meta (mensagens) e o GET de verificação.
+2. **É verificação da Meta** — valida o `hub.verify_token` e responde o `hub.challenge` (exigência da Meta).
+3. **Tem mensagem de texto** — filtra apenas mensagens com texto e **ignora ecos** (`is_echo = true`), evitando loops infinitos em que o bot responde a si mesmo.
+4. **Confirmar 200** — devolve `EVENT_RECEIVED` imediatamente para a Meta (ela exige resposta rápida; o processamento continua em seguida).
+5. **Message a model (Gemini)** — gera a resposta com o prompt de persona. Configurado com **retry automático** (4 tentativas, 45s de intervalo) para tolerar os limites de cota do nível gratuito.
+6. **Send direct message** — envia a resposta ao remetente via Instagram Messaging API (community node).
+7. **Confirmar 200 echo** — descarta eventos de eco/self-message com 200, sem acionar a IA.
+
+## Pré-requisitos
+
+- Uma instância **n8n** (cloud ou self-hosted) com acesso público via HTTPS (para o webhook da Meta).
+- **App na Meta for Developers** ([developers.facebook.com](https://developers.facebook.com)) com o produto **Instagram** configurado e acesso a mensagens.
+- **Conta Instagram Business/Creator** conectada ao app da Meta.
+- **Chave de API do Google Gemini** ([AI Studio](https://aistudio.google.com)).
+- Community node **[@mookielianhd/n8n-nodes-instagram](https://www.npmjs.com/package/@mookielianhd/n8n-nodes-instagram)** instalado (para enviar DMs). Em self-hosted: *Settings → Community nodes*.
+
+## Instalação
+
+1. **Importe o workflow**: no n8n, *Workflows → Import from file* e selecione `instagram-dm-bot.workflow.json`.
+2. **Configure o webhook**: no nó "Instagram Webhook", defina o `path` (ex.: `instagram`) e anote a **URL de produção** (`https://SEU-HOST/webhook/SEU_CAMINHO`).
+3. **Verify token**: no nó "É verificacao da Meta", substitua `SEU_VERIFY_TOKEN_DA_META` por um token seu — o mesmo valor que você colocará no painel da Meta.
+4. **Credenciais**:
+   - **Google Gemini (PaLM) API**: crie a credencial no n8n com sua chave do AI Studio e associe ao nó "Message a model".
+   - **Instagram**: crie a credencial do community node com seu token de acesso (Instagram Business Login / página conectada) e associe ao nó "Send direct message".
+5. **Personalize o prompt** no nó "Message a model" com a sua persona, produtos e regras de atendimento.
+6. **Configure o app da Meta**: em *Instagram → Webhooks*, aponte para a URL de produção, use o mesmo verify token e inscreva o campo **`messages`**.
+7. **Ative (publique) o workflow** — webhooks só respondem em produção quando o workflow está ativo.
+
+## Observações importantes
+
+- **Filtro anti-eco é essencial**: sem ele, a Meta devolve eventos de eco das respostas do próprio bot, criando loops que consomem a cota da API e respondem repetidamente.
+- **Cota do Gemini**: o nível gratuito tem limites por minuto (20 req/min no gemini-3-flash). O retry automático cobre picos; para volume alto, ative o faturamento no projeto do AI Studio.
+- **Resposta rápida à Meta**: o nó "Confirmar 200" responde antes de chamar a IA — sem isso, a Meta pode considerar o webhook com falha e desativá-lo.
+
+## Segurança
+
+Nenhum segredo está neste repositório: tokens, chaves de API e IDs de credenciais foram substituídos por placeholders. Configure-os apenas dentro do seu n8n.
+
+## Licença
+
+MIT — use e adapte livremente.
