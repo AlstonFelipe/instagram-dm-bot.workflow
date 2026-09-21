@@ -1,0 +1,207 @@
+{
+  "name": "Instagram DM Bot — Gemini AI Auto-Reply",
+  "description": "Bot de resposta automática para DMs do Instagram usando Google Gemini. Recebe eventos via webhook da Meta, responde ao desafio de verificação, filtra ecos/self-messages, gera resposta com IA e envia a DM de volta. Desenvolvido no n8n.",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "SEU_CAMINHO_WEBHOOK",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Instagram Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "token-ok",
+              "leftValue": "={{ $json.query['hub.verify_token'] }}",
+              "rightValue": "SEU_VERIFY_TOKEN_DA_META",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-verificacao",
+      "name": "E verificacao da Meta",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query[\"hub.challenge\"] }}",
+        "options": {}
+      },
+      "id": "responder-challenge",
+      "name": "Responder challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [440, -160]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "msg-text",
+              "leftValue": "={{ $json.body.entry[0].messaging[0].message.text }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            },
+            {
+              "id": "not-echo",
+              "leftValue": "={{ $json.body.entry[0].messaging[0].message.is_echo }}",
+              "rightValue": "true",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-tem-mensagem",
+      "name": "Tem mensagem de texto",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 80]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": {}
+      },
+      "id": "confirmar-200",
+      "name": "Confirmar 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3-flash-preview",
+          "cachedResultName": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Você é o assistente virtual oficial do escritor Alston Fhellype na DM do Instagram (@alstonfhellype). Sua missão é responder leitores e interessados de forma cordial, acolhedora, objetiva e muito natural (como se fosse um humano conversando).\n\nSobre o Autor e Obras Literárias:\nAlston Fhellype é um autor independente brasileiro. Suas obras abordam comportamento, infância, memórias, paternidade, ficção e desenvolvimento pessoal. Ele possui 10 obras publicadas (disponíveis na Amazon em formato físico e e-book via KDP).\n\nCatálogo Oficial de Livros:\n\nO Não Que Ninguém Espera: Limites, assertividade e a força de dizer não (Participante do Prêmio Kindle de Literatura).\n\nO Segredo da Fala Invisível: Como ler os lábios com precisão mesmo sem ouvir uma única palavra.\n\nA Arte de Ler as Pessoas Antes Mesmo que Elas Digam Uma Palavra: Comportamento e sinais de comunicação.\n\nEu Te Amo Antes Mesmo de Você Nascer: Memórias, cartas e ensinamentos de um pai para sua filha.\n\nO Homem que Morava nos Meus Olhos: Ficção, memória e interioridade.\n\nSeu Cachorro Fala! E Agora Você Entende: Guia prático de linguagem corporal canina.\n\nSeu Gato Fala! E Agora Você Entende: Guia prático sobre o comportamento e linguagem felina.\n\nO Que Eu Gostaria Que Tivessem Me Contado Antes: Mais de 1000 conselhos práticos para todas as fases da vida.\n\nDeus Sempre Esteve Presente Em Sua Vida: Reflexão cristã sobre fé, presença e recomeços.\n\nDINOFUN: Livro infantil de colorir com dinossauros.\n\nRegras de Atendimento:\n\nSeja breve, direto e amigável (lembre-se que é uma conversa de Instagram). Não mande textos gigantescos.\n\nSe a pessoa perguntar onde ou como comprar, direcione-a para a pesquisa da Amazon (\"basta pesquisar por Alston Fhellype na Amazon\") ou para o site oficial: www.alstonfhellype.com.br.\n\nResponda APENAS com base nestas informações do catálogo. Não invente livros.\n\nResponda apenas o que o usuário perguntar. Se ele apenas der um \"Olá\", cumprimente, diga que é o assistente do autor e pergunte como pode ajudar.\nMensagem enviada pelo leitor: {{ $('Tem mensagem de texto').item.json.body.entry[0].messaging[0].message.text }}",
+              "role": "user"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "gemini-model",
+      "name": "Message a model",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [880, 0],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "SUA_CREDENCIAL_GEMINI_ID",
+          "name": "SUA_CREDENCIAL_GOOGLE_GEMINI"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 45000
+    },
+    {
+      "parameters": {
+        "resource": "messaging",
+        "node": "me",
+        "recipientId": "={{ $('Tem mensagem de texto').item.json.body.entry[0].messaging[0].sender.id }}",
+        "messageText": "={{ $json.content.parts[0].text }}"
+      },
+      "id": "send-dm",
+      "name": "Send direct message",
+      "type": "@mookielianhd/n8n-nodes-instagram.instagram",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "credentials": {
+        "instagramApi": {
+          "id": "SUA_CREDENCIAL_INSTAGRAM_ID",
+          "name": "SUA_CREDENCIAL_INSTAGRAM"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": {}
+      },
+      "id": "confirmar-200-echo",
+      "name": "Confirmar 200 echo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [660, 240]
+    }
+  ],
+  "connections": {
+    "Instagram Webhook": {
+      "main": [
+        [
+          { "node": "E verificacao da Meta", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Tem mensagem de texto", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "E verificacao da Meta": {
+      "main": [
+        [
+          { "node": "Responder challenge", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Tem mensagem de texto", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Tem mensagem de texto": {
+      "main": [
+        [
+          { "node": "Confirmar 200", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Confirmar 200 echo", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Confirmar 200": {
+      "main": [
+        [
+          { "node": "Message a model", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          { "node": "Send direct message", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
